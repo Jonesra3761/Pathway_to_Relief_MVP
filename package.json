@@ -1,0 +1,25 @@
+{
+  "name": "pathway_to_relief_mvp",
+  "version": "1.0.0",
+  "description": "A web app for validating pathways to relief. Built as a learning project.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jonesra3761/Pathway_to_Relief_MVP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Jonesra3761/Pathway_to_Relief_MVP/issues"
+  },
+  "homepage": "https://github.com/Jonesra3761/Pathway_to_Relief_MVP#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
+    "express": "^5.2.1"
+  }
+}
