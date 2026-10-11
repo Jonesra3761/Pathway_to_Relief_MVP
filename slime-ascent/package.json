@@ -1,0 +1,1 @@
+{"name":"slime-ascent","version":"0.1.0","type":"module","scripts":{"dev":"vite --host","build":"tsc --noEmit && vite build"},"dependencies":{"three":"^0.180.0"},"devDependencies":{"vite":"^7.1.0","typescript":"^5.9.3","@types/three":"^0.180.0"}}
