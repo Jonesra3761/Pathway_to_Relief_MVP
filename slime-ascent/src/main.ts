@@ -1,25 +1,320 @@
 import * as THREE from 'three';
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x14243a);scene.fog=new THREE.Fog(0x14243a,20,90);
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,150);camera.position.set(0,5,17);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));document.querySelector('#app')!.append(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xa6dfff,0x243049,3));const light=new THREE.DirectionalLight(0xffd3a0,3);light.position.set(4,25,10);scene.add(light);
-const mat=(c:number)=>new THREE.MeshStandardMaterial({color:c,roughness:.4});
-function block(x:number,y:number,z:number,w:number,h:number,d:number){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(0x40536a));m.position.set(x,y,z);scene.add(m)}
-block(-6,21,0,1,50,14);block(6,21,0,1,50,14);
-const pins:THREE.Vector3[]=[];for(let i=0;i<25;i++){const p=new THREE.Vector3(i%2?-4.9:4.9,1+i*1.65,Math.sin(i*.8)*2.4);pins.push(p);const m=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,1.4,16),mat(i%5===4?0x71e7ef:0xc5a57b));m.rotation.z=Math.PI/2;m.position.copy(p);scene.add(m)}
-const slimeMat=new THREE.MeshPhysicalMaterial({color:0x5af0bc,transparent:true,opacity:.85,roughness:.12,clearcoat:1});const slime=new THREE.Mesh(new THREE.SphereGeometry(.65,32,24),slimeMat);scene.add(slime);
-for(const x of [-.23,.23]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.07,12,12),mat(0x12293d));eye.position.set(x,.1,.6);slime.add(eye)}
-const tether=new THREE.Mesh(new THREE.CylinderGeometry(.12,.22,1,12),slimeMat);scene.add(tether);
-const path=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineDashedMaterial({color:0xffffff,dashSize:.3,gapSize:.18}));scene.add(path);
-const modes=[{name:'Light',speed:15,gravity:8,catch:.65,color:0x5af0bc},{name:'Medium',speed:19,gravity:10,catch:.85,color:0x5dbfff},{name:'Dense',speed:23,gravity:12,catch:1.05,color:0xb987ff}];
-let mode=0,attached=0,air=false,aim=false,peek=false,drag=new THREE.Vector2(),start=new THREE.Vector2(),velocity=new THREE.Vector3(),pos=pins[0].clone().add(new THREE.Vector3(0,-1,0)),flight=0,streak=0,misses=0,highest=0,started=performance.now(),peekYaw=0,peekPitch=0,finished=false;
-const hud=document.createElement('div');hud.style.cssText='position:absolute;top:12px;left:12px;right:12px;color:white;font:14px system-ui;text-shadow:0 2px 5px black;pointer-events:none';hud.innerHTML='<b style="font-size:23px;letter-spacing:2px">SLIME ASCENT</b><p id="stats"></p><p id="hint">Drag slime to aim, release to launch</p><div id="buttons" style="pointer-events:auto"></div>';document.body.append(hud);
-const buttons=hud.querySelector('#buttons')!;for(let i=0;i<3;i++){const b=document.createElement('button');b.textContent=modes[i].name;b.onclick=()=>{mode=i;slimeMat.color.setHex(modes[i].color)};buttons.append(b)}const restart=document.createElement('button');restart.textContent='Restart';buttons.append(restart);document.querySelectorAll('button').forEach(b=>(b as HTMLElement).style.cssText='padding:10px;margin:3px;border:1px solid #89cddd;border-radius:8px;background:#203d57;color:white');
-function reset(){attached=0;air=false;aim=false;pos=pins[0].clone().add(new THREE.Vector3(0,-1,0));velocity.set(0,0,0);flight=0;streak=0;misses=0;highest=0;finished=false;started=performance.now()}restart.onclick=reset;
-const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();function onSlime(e:PointerEvent){mouse.set(e.clientX/innerWidth*2-1,1-e.clientY/innerHeight*2);ray.setFromCamera(mouse,camera);return ray.intersectObject(slime,true).length>0}
-renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{renderer.domElement.setPointerCapture(e.pointerId);start.set(e.clientX,e.clientY);aim=!air&&!finished&&onSlime(e);peek=!aim;drag.set(0,0)});
-renderer.domElement.addEventListener('pointermove',e=>{if(aim)drag.set(e.clientX-start.x,e.clientY-start.y);else if(peek){peekYaw=THREE.MathUtils.clamp(peekYaw+(e.clientX-start.x)*.004,-.8,.8);peekPitch=THREE.MathUtils.clamp(peekPitch+(e.clientY-start.y)*.003,-.4,.4);start.set(e.clientX,e.clientY)}});
-function launchVector(){const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),up=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);const v=right.multiplyScalar(-drag.x).add(up.multiplyScalar(drag.y));v.y=Math.max(v.y,2);return v.normalize().multiplyScalar(modes[mode].speed*Math.min(drag.length()/130,1.3))}
-renderer.domElement.addEventListener('pointerup',()=>{if(aim&&drag.length()>15){velocity.copy(launchVector());air=true;flight=0}aim=false;peek=false});
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-let last=performance.now();function animate(now:number){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.033);last=now;const anchor=pins[attached];if(air){flight+=dt;velocity.y-=modes[mode].gravity*dt;pos.addScaledVector(velocity,dt);let found=-1;for(let i=0;i<pins.length;i++)if(i!==attached&&pos.distanceTo(pins[i])<modes[mode].catch+(streak>=3?.3:0)){found=i;break}if(found>=0){attached=found;highest=Math.max(highest,found);streak++;air=false;if(found===pins.length-1)finished=true}else if(flight>4||pos.y<anchor.y-8){air=false;misses++;streak=0}}if(!air){pos.copy(anchor).add(new THREE.Vector3(Math.sin(now*.002)*.08,-1,0));if(aim)pos.addScaledVector(launchVector(),-.045)}slime.position.copy(pos);slime.scale.set(air?1.08:.84,air?.93:1.25,air?1.08:.84);tether.visible=!air;if(!air){const delta=pos.clone().sub(anchor);tether.position.copy(anchor).add(pos).multiplyScalar(.5);tether.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());tether.scale.set(1,delta.length(),1)}path.visible=aim;if(aim){const v=launchVector(),pts=[];for(let t=0;t<2;t+=.05)pts.push(pos.clone().addScaledVector(v,t).add(new THREE.Vector3(0,-.5*modes[mode].gravity*t*t,0)));path.geometry.dispose();path.geometry=new THREE.BufferGeometry().setFromPoints(pts);path.computeLineDistances()}const target=pos.clone().add(new THREE.Vector3(0,2,0));camera.position.lerp(target.clone().add(new THREE.Vector3(Math.sin(peekYaw)*15,4+peekPitch*6,Math.cos(peekYaw)*15)),.07);camera.lookAt(target);hud.querySelector('#stats')!.textContent=`${((now-started)/1000).toFixed(1)}s | Pin ${highest+1}/25 | Misses ${misses} | Streak ${streak} | ${modes[mode].name}`;hud.querySelector('#hint')!.textContent=finished?'Summit reached! Restart to race again':air?'Catch a pin!':aim?'Release to launch':'Drag slime to aim · Drag background to peek';renderer.render(scene,camera)}requestAnimationFrame(animate);
+
+// The tower is played side-on: everything moves in the x/y plane and the
+// camera always faces it from the front, so walls can never block the view.
+
+type Rect = { x: number; y: number; w: number; h: number; mesh: THREE.Mesh; sweep?: { range: number; speed: number } };
+type Mode = { name: string; speed: number; gravity: number; catch: number; color: number };
+
+const TOWER_HALF = 7;
+const LAYER_HEIGHT = 10;
+const LAYERS = 5;
+const RADIUS = 0.65;
+const DEPTH = 3;
+const MODES: Mode[] = [
+  { name: 'Light', speed: 15, gravity: 8, catch: 0.75, color: 0x5af0bc },
+  { name: 'Medium', speed: 19, gravity: 10, catch: 0.9, color: 0x5dbfff },
+  { name: 'Dense', speed: 23, gravity: 12, catch: 1.05, color: 0xb987ff },
+];
+const LAYER_COLORS = [0x2b4562, 0x33506b, 0x3d4f72, 0x4a4a74, 0x574770];
+
+// Ledges are [centre x, centre y, width]; every ledge is 1 unit thick.
+// Each layer's ceiling leaves a gap on a different side, so the route zig-zags upward.
+const LEDGES: [number, number, number][] = [
+  [0, -1, 14], // floor
+  [-2.5, 10, 9], // layer 1 ceiling, gap on the right
+  [0, 15, 4], // layer 2 block in the middle
+  [2.5, 20, 9], // layer 2 ceiling, gap on the left
+  [0, 25, 3], // layer 3 block over the centre
+  [-4.75, 30, 4.5], // layer 3 ceiling, gap in the centre
+  [4.75, 30, 4.5],
+  [-2.5, 40, 9], // layer 4 ceiling, gap on the right
+  [-1.5, 45, 3], // layer 5 overhang
+  [0, 51, 14], // roof
+];
+// Layer 4 has a ledge that sweeps side to side.
+const SWEEPER = { y: 35, w: 3, range: 3, speed: 0.9 };
+
+const PINS: [number, number][] = [
+  [0, 1.5], [-4.5, 4.5], [3, 7.5],
+  [5, 12.5], [-4.5, 14], [-1, 17.5],
+  [-5, 22.5], [4.5, 24], [-3, 27.5],
+  [0, 32.5], [5.5, 37.8],
+  [5, 42.5], [-4.5, 44], [-4.5, 47.6], [2, 49.4],
+];
+const SUMMIT = PINS.length - 1;
+
+// ---------- scene ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14243a);
+scene.fog = new THREE.Fog(0x14243a, 60, 160);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 250);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.querySelector('#app')!.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xa6dfff, 0x243049, 2.6));
+const sun = new THREE.DirectionalLight(0xffd3a0, 2.6);
+sun.position.set(6, 30, 20);
+scene.add(sun);
+
+const mat = (color: number, roughness = 0.5) => new THREE.MeshStandardMaterial({ color, roughness });
+function box(x: number, y: number, z: number, w: number, h: number, d: number, color: number) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  scene.add(m);
+  return m;
+}
+
+// Back wall, banded by layer, plus side walls. All sit behind or beside the play plane.
+for (let i = 0; i < LAYERS; i++) box(0, i * LAYER_HEIGHT + 5, -DEPTH / 2 - 0.5, TOWER_HALF * 2 + 2, LAYER_HEIGHT, 1, LAYER_COLORS[i]);
+for (const side of [-1, 1]) box(side * (TOWER_HALF + 0.5), 25, 0, 1, 54, DEPTH, 0x40536a);
+
+const rects: Rect[] = LEDGES.map(([x, y, w]) => ({ x, y, w, h: 1, mesh: box(x, y, 0, w, 1, DEPTH, 0x6b7f99) }));
+const sweeper: Rect = { x: 0, y: SWEEPER.y, w: SWEEPER.w, h: 1, mesh: box(0, SWEEPER.y, 0, SWEEPER.w, 1, DEPTH, 0xe0875a), sweep: SWEEPER };
+rects.push(sweeper);
+
+const pins = PINS.map(([x, y], i) => {
+  const p = new THREE.Vector3(x, y, 0);
+  const color = i === SUMMIT ? 0xffd166 : i === 0 ? 0x71e7ef : 0xc5a57b;
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 2.4, 16), mat(color, 0.35));
+  m.rotation.x = Math.PI / 2;
+  m.position.set(x, y, -0.8);
+  scene.add(m);
+  return p;
+});
+
+// Layer labels painted on the back wall.
+for (let i = 0; i < LAYERS; i++) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.font = 'bold 40px system-ui, sans-serif';
+  g.fillText(`LAYER ${i + 1}`, 10, 46);
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  label.position.set(-TOWER_HALF + 2.4, i * LAYER_HEIGHT + 8.6, -DEPTH / 2 + 0.01);
+  scene.add(label);
+}
+
+const slimeMat = new THREE.MeshPhysicalMaterial({ color: MODES[0].color, transparent: true, opacity: 0.88, roughness: 0.12, clearcoat: 1 });
+const slime = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 32, 24), slimeMat);
+scene.add(slime);
+for (const x of [-0.23, 0.23]) {
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), mat(0x12293d));
+  eye.position.set(x, 0.1, 0.6);
+  slime.add(eye);
+}
+const tether = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 1, 12), slimeMat);
+scene.add(tether);
+const path = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.3, gapSize: 0.18 }));
+scene.add(path);
+
+// ---------- HUD ----------
+const $ = (id: string) => document.getElementById(id)!;
+const modeButtons = MODES.map((m, i) => {
+  const b = document.createElement('button');
+  b.textContent = m.name;
+  b.onclick = () => setMode(i);
+  $('modes').append(b);
+  return b;
+});
+$('restart').onclick = reset;
+
+// ---------- state ----------
+let mode = 0, attached = 0, air = false, aiming = false, finished = false;
+let started = 0, elapsed = 0, misses = 0, streak = 0, topY = 0, restTime = 0, flight = 0, missFlash = 0;
+let time = 0;
+const pos = new THREE.Vector3(), vel = new THREE.Vector3();
+const dragStart = new THREE.Vector2(), drag = new THREE.Vector2();
+let best = loadBest();
+
+function loadBest() { try { return Number(localStorage.getItem('slime-ascent-best')) || 0; } catch { return 0; } }
+function saveBest(t: number) { try { localStorage.setItem('slime-ascent-best', String(t)); } catch { /* storage unavailable */ } }
+
+function setMode(i: number) {
+  if (air) return;
+  mode = i;
+  slimeMat.color.setHex(MODES[i].color);
+  modeButtons.forEach((b, j) => b.classList.toggle('active', j === i));
+}
+
+function hangPoint(i: number) { return pins[i].clone().add(new THREE.Vector3(0, -1, 0)); }
+
+function reset() {
+  attached = 0; air = false; aiming = false; finished = false;
+  started = 0; elapsed = 0; misses = 0; streak = 0; topY = 0;
+  pos.copy(hangPoint(0)); vel.set(0, 0, 0);
+  camera.position.set(0, pos.y + 3, camDistance());
+}
+
+// ---------- physics ----------
+function updateSweeper(r: Rect, t: number) {
+  if (!r.sweep) return;
+  r.x = Math.sin(t * r.sweep.speed) * r.sweep.range;
+  r.mesh.position.x = r.x;
+}
+
+// Push a circle out of every ledge it overlaps and bounce it. Returns true on contact.
+function collide(p: THREE.Vector3, v: THREE.Vector3) {
+  let hit = false;
+  for (const r of rects) {
+    const cx = THREE.MathUtils.clamp(p.x, r.x - r.w / 2, r.x + r.w / 2);
+    const cy = THREE.MathUtils.clamp(p.y, r.y - r.h / 2, r.y + r.h / 2);
+    let nx = p.x - cx, ny = p.y - cy;
+    let d = Math.hypot(nx, ny);
+    if (d >= RADIUS) continue;
+    if (d === 0) { nx = 0; ny = p.y >= r.y ? 1 : -1; d = 0; } else { nx /= d; ny /= d; }
+    p.x += nx * (RADIUS - d); p.y += ny * (RADIUS - d);
+    const vn = v.x * nx + v.y * ny;
+    if (vn < 0) {
+      v.x -= 1.4 * vn * nx; v.y -= 1.4 * vn * ny; // restitution 0.4
+      v.x *= 0.85; // a little grip on the surface
+    }
+    hit = true;
+  }
+  const wall = TOWER_HALF - RADIUS;
+  if (Math.abs(p.x) > wall) { p.x = Math.sign(p.x) * wall; if (v.x * p.x > 0) v.x *= -0.4; hit = true; }
+  return hit;
+}
+
+function catchablePin(p: THREE.Vector3) {
+  const reach = MODES[mode].catch + (streak >= 3 ? 0.3 : 0);
+  for (let i = 0; i < pins.length; i++) if (i !== attached && p.distanceTo(pins[i]) < reach) return i;
+  return -1;
+}
+
+const SUBSTEPS = 4;
+function step(p: THREE.Vector3, v: THREE.Vector3, dt: number) {
+  v.y -= MODES[mode].gravity * dt;
+  p.addScaledVector(v, dt);
+  return collide(p, v);
+}
+
+function launchVelocity() {
+  // Slingshot: pull back, and the slime flies the opposite way.
+  const power = Math.min(drag.length() / 130, 1.3) * MODES[mode].speed;
+  return new THREE.Vector3(-drag.x, drag.y, 0).normalize().multiplyScalar(power);
+}
+
+function previewPath() {
+  const p = hangPoint(attached).addScaledVector(launchVelocity().normalize(), -0.4), v = launchVelocity();
+  const pts = [p.clone()];
+  const dt = 1 / 60 / SUBSTEPS;
+  for (let i = 0; i < 60 * SUBSTEPS * 0.9; i++) {
+    step(p, v, dt);
+    if (i % SUBSTEPS === 0) pts.push(p.clone());
+    if (catchablePin(p) >= 0) { pts.push(p.clone()); break; }
+  }
+  path.geometry.dispose();
+  path.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+  path.computeLineDistances();
+}
+
+function miss() {
+  air = false; misses++; streak = 0; missFlash = 1.6;
+  pos.copy(hangPoint(attached)); vel.set(0, 0, 0);
+}
+
+// ---------- input: drag anywhere to aim ----------
+const canvas = renderer.domElement;
+canvas.style.touchAction = 'none';
+canvas.addEventListener('pointerdown', e => {
+  if (air || finished) return;
+  canvas.setPointerCapture(e.pointerId);
+  aiming = true;
+  dragStart.set(e.clientX, e.clientY);
+  drag.set(0, 0);
+  $('tutorial').hidden = true;
+});
+canvas.addEventListener('pointermove', e => { if (aiming) drag.set(e.clientX - dragStart.x, e.clientY - dragStart.y); });
+canvas.addEventListener('pointerup', () => {
+  if (aiming && drag.length() > 15) {
+    vel.copy(launchVelocity());
+    air = true; flight = 0; restTime = 0;
+    if (!started) started = performance.now();
+  }
+  aiming = false;
+});
+canvas.addEventListener('pointercancel', () => { aiming = false; });
+
+// ---------- camera ----------
+// Pull the camera back far enough to show the whole tower width on any screen.
+function camDistance() {
+  const halfWidth = TOWER_HALF + 1.5;
+  return THREE.MathUtils.clamp(halfWidth / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect), 24, 64);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now: number) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.033);
+  last = now; time += dt;
+  updateSweeper(sweeper, time);
+  const anchor = pins[attached];
+
+  if (air) {
+    flight += dt;
+    const h = dt / SUBSTEPS;
+    for (let s = 0; s < SUBSTEPS && air; s++) {
+      const contact = step(pos, vel, h);
+      restTime = contact && vel.length() < 1.5 ? restTime + h : 0;
+      const found = catchablePin(pos);
+      if (found >= 0) {
+        attached = found; air = false; streak++;
+        if (found === SUMMIT) {
+          finished = true; elapsed = (now - started) / 1000;
+          if (!best || elapsed < best) { best = elapsed; saveBest(best); }
+        }
+      }
+    }
+    if (air && (flight > 4 || pos.y < anchor.y - 12 || restTime > 0.4)) miss();
+  }
+  if (!air) {
+    pos.copy(pins[attached]).add(new THREE.Vector3(Math.sin(now * 0.002) * 0.08, -1, 0));
+    if (aiming && drag.length() > 15) pos.addScaledVector(launchVelocity().normalize(), -0.4);
+  }
+  topY = Math.max(topY, pos.y);
+
+  slime.position.copy(pos);
+  slime.scale.set(air ? 1.08 : 0.84, air ? 0.93 : 1.25, air ? 1.08 : 0.84);
+  tether.visible = !air;
+  if (!air) {
+    const a = pins[attached], delta = pos.clone().sub(a);
+    tether.position.copy(a).add(pos).multiplyScalar(0.5);
+    tether.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.clone().normalize());
+    tether.scale.set(1, delta.length(), 1);
+  }
+  path.visible = aiming && drag.length() > 15;
+  if (path.visible) previewPath();
+
+  // Frame the slime low on screen so the obstacles above it are visible.
+  const target = new THREE.Vector3(pos.x * 0.15, pos.y + 3.5, 0);
+  camera.position.lerp(new THREE.Vector3(target.x, target.y + 1, camDistance()), 0.08);
+  camera.lookAt(target.x, camera.position.y - 1, 0);
+
+  // HUD
+  const t = finished ? elapsed : started ? (now - started) / 1000 : 0;
+  const layer = Math.min(LAYERS, Math.floor(Math.max(topY, 0) / LAYER_HEIGHT) + 1);
+  $('time').textContent = `${t.toFixed(1)}s`;
+  $('layer').textContent = `${layer}/${LAYERS}`;
+  $('misses').textContent = String(misses);
+  $('best').textContent = best ? `${best.toFixed(1)}s` : '—';
+  missFlash = Math.max(0, missFlash - dt);
+  $('hint').textContent = finished ? 'Summit reached! Restart to race again.'
+    : missFlash > 0 ? 'Missed. Back to your last pin.'
+    : air ? 'Catch a pin!'
+    : aiming ? 'Release to fling'
+    : 'Drag anywhere and pull back to aim';
+  renderer.render(scene, camera);
+}
+
+setMode(0);
+reset();
+requestAnimationFrame(frame);
