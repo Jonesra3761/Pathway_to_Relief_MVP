@@ -10,6 +10,11 @@ const TOWER_HALF = 7;
 const LAYER_HEIGHT = 10;
 const LAYERS = 5;
 const RADIUS = 0.65;
+// How much speed survives a bounce. Walls are springy so you can bank shots off them.
+const WALL_BOUNCE = 0.85;
+const LEDGE_BOUNCE = 0.7;
+// Below this impact speed the slime stops bouncing and settles instead of jittering.
+const SETTLE_SPEED = 1.2;
 const DEPTH = 3;
 const MODES: Mode[] = [
   { name: 'Light', speed: 15, gravity: 8, catch: 0.75, color: 0x5af0bc },
@@ -124,6 +129,8 @@ $('restart').onclick = reset;
 // ---------- state ----------
 let mode = 0, attached = 0, air = false, aiming = false, finished = false;
 let started = 0, elapsed = 0, misses = 0, streak = 0, topY = 0, restTime = 0, flight = 0, missFlash = 0;
+let bounces = 0, bankFlash = 0, bankCount = 0, squash = 0;
+const squashNormal = new THREE.Vector2();
 let time = 0;
 const pos = new THREE.Vector3(), vel = new THREE.Vector3();
 const dragStart = new THREE.Vector2(), drag = new THREE.Vector2();
@@ -143,7 +150,7 @@ function hangPoint(i: number) { return pins[i].clone().add(new THREE.Vector3(0, 
 
 function reset() {
   attached = 0; air = false; aiming = false; finished = false;
-  started = 0; elapsed = 0; misses = 0; streak = 0; topY = 0;
+  started = 0; elapsed = 0; misses = 0; streak = 0; topY = 0; bounces = 0; bankFlash = 0; squash = 0;
   pos.copy(hangPoint(0)); vel.set(0, 0, 0);
   camera.position.set(0, pos.y + 3, camDistance());
 }
@@ -155,8 +162,19 @@ function updateSweeper(r: Rect, t: number) {
   r.mesh.position.x = r.x;
 }
 
-// Push a circle out of every ledge it overlaps and bounce it. Returns true on contact.
-function collide(p: THREE.Vector3, v: THREE.Vector3) {
+type BounceHandler = (x: number, y: number, nx: number, ny: number, speed: number) => void;
+
+// Reflect the velocity off a surface with normal (nx, ny); a slow touch settles instead.
+function bounce(v: THREE.Vector3, nx: number, ny: number, restitution: number, onBounce?: BounceHandler, p?: THREE.Vector3) {
+  const vn = v.x * nx + v.y * ny;
+  if (vn >= 0) return;
+  const e = -vn < SETTLE_SPEED ? 0 : restitution;
+  v.x -= (1 + e) * vn * nx; v.y -= (1 + e) * vn * ny;
+  if (e > 0 && onBounce && p) onBounce(p.x - nx * RADIUS, p.y - ny * RADIUS, nx, ny, -vn);
+}
+
+// Push a circle out of every ledge and wall it overlaps and bounce it. Returns true on contact.
+function collide(p: THREE.Vector3, v: THREE.Vector3, onBounce?: BounceHandler) {
   let hit = false;
   for (const r of rects) {
     const cx = THREE.MathUtils.clamp(p.x, r.x - r.w / 2, r.x + r.w / 2);
@@ -166,15 +184,15 @@ function collide(p: THREE.Vector3, v: THREE.Vector3) {
     if (d >= RADIUS) continue;
     if (d === 0) { nx = 0; ny = p.y >= r.y ? 1 : -1; d = 0; } else { nx /= d; ny /= d; }
     p.x += nx * (RADIUS - d); p.y += ny * (RADIUS - d);
-    const vn = v.x * nx + v.y * ny;
-    if (vn < 0) {
-      v.x -= 1.4 * vn * nx; v.y -= 1.4 * vn * ny; // restitution 0.4
-      v.x *= 0.85; // a little grip on the surface
-    }
+    bounce(v, nx, ny, LEDGE_BOUNCE, onBounce, p);
     hit = true;
   }
   const wall = TOWER_HALF - RADIUS;
-  if (Math.abs(p.x) > wall) { p.x = Math.sign(p.x) * wall; if (v.x * p.x > 0) v.x *= -0.4; hit = true; }
+  if (Math.abs(p.x) > wall) {
+    p.x = Math.sign(p.x) * wall;
+    bounce(v, -Math.sign(p.x), 0, WALL_BOUNCE, onBounce, p);
+    hit = true;
+  }
   return hit;
 }
 
@@ -185,10 +203,10 @@ function catchablePin(p: THREE.Vector3) {
 }
 
 const SUBSTEPS = 4;
-function step(p: THREE.Vector3, v: THREE.Vector3, dt: number) {
+function step(p: THREE.Vector3, v: THREE.Vector3, dt: number, onBounce?: BounceHandler) {
   v.y -= MODES[mode].gravity * dt;
   p.addScaledVector(v, dt);
-  return collide(p, v);
+  return collide(p, v, onBounce);
 }
 
 function launchVelocity() {
@@ -197,11 +215,13 @@ function launchVelocity() {
   return new THREE.Vector3(-drag.x, drag.y, 0).normalize().multiplyScalar(power);
 }
 
+// Long enough to show the first bank shot off a wall.
+const PREVIEW_SECONDS = 1.3;
 function previewPath() {
   const p = hangPoint(attached).addScaledVector(launchVelocity().normalize(), -0.4), v = launchVelocity();
   const pts = [p.clone()];
   const dt = 1 / 60 / SUBSTEPS;
-  for (let i = 0; i < 60 * SUBSTEPS * 0.9; i++) {
+  for (let i = 0; i < 60 * SUBSTEPS * PREVIEW_SECONDS; i++) {
     step(p, v, dt);
     if (i % SUBSTEPS === 0) pts.push(p.clone());
     if (catchablePin(p) >= 0) { pts.push(p.clone()); break; }
@@ -209,6 +229,31 @@ function previewPath() {
   path.geometry.dispose();
   path.geometry = new THREE.BufferGeometry().setFromPoints(pts);
   path.computeLineDistances();
+}
+
+// ---------- bounce feedback ----------
+const rings = Array.from({ length: 6 }, () => {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+  scene.add(m);
+  return { mesh: m, life: 0 };
+});
+let nextRing = 0;
+function onBounce(x: number, y: number, nx: number, ny: number, speed: number) {
+  bounces++;
+  squash = Math.min(1, speed / 12);
+  squashNormal.set(nx, ny);
+  const r = rings[nextRing++ % rings.length];
+  r.life = 1;
+  r.mesh.position.set(x, y, 0.2);
+  (r.mesh.material as THREE.MeshBasicMaterial).color.setHex(MODES[mode].color);
+}
+function updateRings(dt: number) {
+  for (const r of rings) {
+    r.life = Math.max(0, r.life - dt * 2.5);
+    r.mesh.visible = r.life > 0;
+    r.mesh.scale.setScalar(1 + (1 - r.life) * 1.6);
+    (r.mesh.material as THREE.MeshBasicMaterial).opacity = r.life * 0.9;
+  }
 }
 
 function miss() {
@@ -231,7 +276,7 @@ canvas.addEventListener('pointermove', e => { if (aiming) drag.set(e.clientX - d
 canvas.addEventListener('pointerup', () => {
   if (aiming && drag.length() > 15) {
     vel.copy(launchVelocity());
-    air = true; flight = 0; restTime = 0;
+    air = true; flight = 0; restTime = 0; bounces = 0;
     if (!started) started = performance.now();
   }
   aiming = false;
@@ -263,18 +308,19 @@ function frame(now: number) {
     flight += dt;
     const h = dt / SUBSTEPS;
     for (let s = 0; s < SUBSTEPS && air; s++) {
-      const contact = step(pos, vel, h);
+      const contact = step(pos, vel, h, onBounce);
       restTime = contact && vel.length() < 1.5 ? restTime + h : 0;
       const found = catchablePin(pos);
       if (found >= 0) {
         attached = found; air = false; streak++;
+        if (bounces > 0) { bankFlash = 1.6; bankCount = bounces; }
         if (found === SUMMIT) {
           finished = true; elapsed = (now - started) / 1000;
           if (!best || elapsed < best) { best = elapsed; saveBest(best); }
         }
       }
     }
-    if (air && (flight > 4 || pos.y < anchor.y - 12 || restTime > 0.4)) miss();
+    if (air && (flight > 5 || pos.y < anchor.y - 12 || restTime > 0.4)) miss();
   }
   if (!air) {
     pos.copy(pins[attached]).add(new THREE.Vector3(Math.sin(now * 0.002) * 0.08, -1, 0));
@@ -283,7 +329,12 @@ function frame(now: number) {
   topY = Math.max(topY, pos.y);
 
   slime.position.copy(pos);
-  slime.scale.set(air ? 1.08 : 0.84, air ? 0.93 : 1.25, air ? 1.08 : 0.84);
+  // Squash flat against whatever it just hit, then spring back.
+  squash = Math.max(0, squash - dt * 5);
+  const sx = air ? 1.08 : 0.84, sy = air ? 0.93 : 1.25;
+  const flatX = squash * 0.45 * Math.abs(squashNormal.x), flatY = squash * 0.45 * Math.abs(squashNormal.y);
+  slime.scale.set(sx * (1 - flatX + flatY * 0.6), sy * (1 - flatY + flatX * 0.6), air ? 1.08 : 0.84);
+  updateRings(dt);
   tether.visible = !air;
   if (!air) {
     const a = pins[attached], delta = pos.clone().sub(a);
@@ -307,8 +358,10 @@ function frame(now: number) {
   $('misses').textContent = String(misses);
   $('best').textContent = best ? `${best.toFixed(1)}s` : '—';
   missFlash = Math.max(0, missFlash - dt);
+  bankFlash = Math.max(0, bankFlash - dt);
   $('hint').textContent = finished ? 'Summit reached! Restart to race again.'
     : missFlash > 0 ? 'Missed. Back to your last pin.'
+    : bankFlash > 0 ? (bankCount > 1 ? `Bank shot ×${bankCount}!` : 'Bank shot!')
     : air ? 'Catch a pin!'
     : aiming ? 'Release to fling'
     : 'Drag anywhere and pull back to aim';
