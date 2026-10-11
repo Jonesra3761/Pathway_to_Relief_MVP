@@ -17,7 +17,8 @@ export class BootScene extends Phaser.Scene {
     this.makeBullets();
     this.makeEnemies();
     this.makeParticles();
-    this.scene.start(SCENES.menu);
+    this.makeLobbyIcons();
+    this.scene.start(SCENES.lobby);
   }
 
   private gfx(): Phaser.GameObjects.Graphics {
@@ -151,6 +152,51 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xffffff);
     g.fillRect(0, 0, 2, 2);
     g.generateTexture(TEXTURES.star, 2, 2);
+    g.destroy();
+  }
+
+  private makeLobbyIcons(): void {
+    // Mini slot machine.
+    let g = this.gfx();
+    g.fillStyle(COLORS.redDark);
+    g.fillRoundedRect(2, 8, 52, 46, 6);
+    g.fillStyle(COLORS.red);
+    g.fillRoundedRect(0, 4, 52, 46, 6);
+    g.fillStyle(COLORS.yellow);
+    g.fillRoundedRect(8, 0, 36, 10, 3);
+    g.fillStyle(COLORS.cream);
+    [6, 20, 34].forEach((x) => g.fillRect(x, 16, 12, 22));
+    g.fillStyle(COLORS.red);
+    g.fillCircle(12, 27, 4);
+    g.fillStyle(COLORS.yellow);
+    g.fillCircle(26, 27, 4);
+    g.fillStyle(COLORS.lime);
+    g.fillCircle(40, 27, 4);
+    g.fillStyle(COLORS.creamDark);
+    g.fillRect(55, 12, 3, 22);
+    g.fillStyle(COLORS.yellow);
+    g.fillCircle(56.5, 10, 4);
+    g.generateTexture(TEXTURES.iconSlots, 61, 56);
+    g.destroy();
+
+    // Two fanned playing cards.
+    g = this.gfx();
+    g.fillStyle(COLORS.red);
+    g.fillRoundedRect(2, 6, 32, 44, 4);
+    g.lineStyle(2, COLORS.yellow);
+    g.strokeRoundedRect(5, 9, 26, 38, 3);
+    g.fillStyle(COLORS.creamDark);
+    g.fillRoundedRect(20, 2, 34, 48, 4);
+    g.fillStyle(COLORS.cream);
+    g.fillRoundedRect(18, 0, 34, 48, 4);
+    g.fillStyle(COLORS.red);
+    // Heart: two circles and a triangle.
+    g.fillCircle(30, 22, 6);
+    g.fillCircle(40, 22, 6);
+    g.fillTriangle(24.5, 24, 45.5, 24, 35, 36);
+    g.fillRect(22, 5, 3, 9);
+    g.fillRect(22, 5, 7, 3);
+    g.generateTexture(TEXTURES.iconBlackjack, 56, 52);
     g.destroy();
   }
 }

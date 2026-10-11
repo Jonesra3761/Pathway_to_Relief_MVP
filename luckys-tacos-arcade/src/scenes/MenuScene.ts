@@ -5,7 +5,7 @@ import { Starfield } from '../entities/Starfield';
 import { ScoreManager, browserStore } from '../systems/ScoreManager';
 import { ENEMY_KINDS, type EnemyKind } from '../systems/waves';
 import { SCENES, TEXTURES } from './keys';
-import { button, text } from './ui';
+import { backButton, button, text } from './ui';
 
 const ROSTER: { kind: EnemyKind; name: string }[] = [
   { kind: 'chili', name: 'Chili Commander' },
@@ -58,6 +58,8 @@ export class MenuScene extends Phaser.Scene {
     text(this, cx, 580, 'Keyboard: ← → or A / D', 12, CSS.cream).setAlpha(0.6);
     text(this, cx, GAME_HEIGHT - 20, '3 lives · Clear waves · Beat the high score', 11, CSS.red);
 
+    backButton(this, () => this.leaveTo(SCENES.lobby));
+
     this.input.keyboard?.once('keydown-SPACE', () => this.startGame());
     this.input.keyboard?.once('keydown-ENTER', () => this.startGame());
   }
@@ -67,8 +69,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startGame(): void {
+    this.leaveTo(SCENES.game);
+  }
+
+  private leaveTo(scene: string): void {
     if (this.started) return;
     this.started = true;
-    this.scene.start(SCENES.game);
+    this.scene.start(scene);
   }
 }

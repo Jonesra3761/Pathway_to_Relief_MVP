@@ -30,4 +30,5 @@ export const ENEMY = {
 
 export const STORAGE_KEYS = {
   highScore: 'luckys-tacos-arcade:high-score',
+  credits: 'luckys-tacos-arcade:credits',
 } as const;

@@ -2,9 +2,12 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './config/gameConfig';
 import { COLORS } from './config/theme';
 import { BootScene } from './scenes/BootScene';
+import { LobbyScene } from './scenes/LobbyScene';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { GameOverScene } from './scenes/GameOverScene';
+import { SlotsScene } from './games/slots/SlotsScene';
+import { BlackjackScene } from './games/blackjack/BlackjackScene';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -22,7 +25,7 @@ const game = new Phaser.Game({
   },
   input: { activePointers: 2 },
   render: { antialias: true, roundPixels: false },
-  scene: [BootScene, MenuScene, GameScene, GameOverScene],
+  scene: [BootScene, LobbyScene, MenuScene, GameScene, GameOverScene, SlotsScene, BlackjackScene],
 });
 
 // Exposed only with ?debug so automated smoke tests can inspect state.

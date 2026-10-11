@@ -61,7 +61,7 @@ export class GameOverScene extends Phaser.Scene {
       .catch((err) => console.error('[rewards] onRunComplete failed', err));
 
     button(this, cx, 440, 'PLAY AGAIN', () => this.go(SCENES.game));
-    button(this, cx, 510, 'MAIN MENU', () => this.go(SCENES.menu), 'secondary');
+    button(this, cx, 510, 'ALL GAMES', () => this.go(SCENES.lobby), 'secondary');
     text(this, cx, GAME_HEIGHT - 40, 'Press R or Space to restart', 12, CSS.cream).setAlpha(0.6);
 
     const kb = this.input.keyboard;

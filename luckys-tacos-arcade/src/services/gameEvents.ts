@@ -10,6 +10,16 @@ export interface GameEventMap {
   'enemy:destroyed': { kind: string; points: number; diving: boolean };
   'player:hit': { livesRemaining: number };
   'run:end': RunSummary;
+  /** One settled round of a credit game (slots spin, blackjack hand). */
+  'casino:round': CasinoRound;
+}
+
+export interface CasinoRound {
+  game: 'slots' | 'blackjack';
+  /** Total credits wagered this round (including doubles/splits). */
+  wagered: number;
+  /** Total credits returned to the player (0 on a loss; includes the stake on a win/push). */
+  returned: number;
 }
 
 export interface RunSummary {
