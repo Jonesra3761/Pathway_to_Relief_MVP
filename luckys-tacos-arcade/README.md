@@ -54,6 +54,28 @@ Taco Slots and Taco 21 share one **play-credit wallet** (`src/systems/CreditWall
 - Clearing a wave starts the next one, faster and with more divers.
 - The high score is saved in the browser's `localStorage`.
 
+## How to play Taco Slots
+
+- 3 reels, 3 rows, **5 paylines** always on: the three rows plus both diagonals.
+- Choose a line bet of 1, 2 or 5 with − / +, so the total bet is 5, 10 or 25. Tap **SPIN** (or press Space).
+- Three of a kind on a line pays the line bet × the symbol's pay: Lucky Taco 400, Hot Sauce 60,
+  Chili 25, Avocado 12, Lime 8, Onion 5. Wins on different lines add up.
+- The **Lucky Taco is wild** and stands in for any symbol; three Tacos on a line is the jackpot.
+- **PAYS** opens the paytable and the payline shapes.
+- The math is verified by enumerating every reel combination in `tests/slots.test.ts`: about
+  **94.8% average return**, and about 31% of spins pay something.
+
+## How to play Taco 21 (blackjack)
+
+- Pick a chip (2, 4, 10 or 20) and tap **DEAL**. Then **HIT**, **STAND**, **DOUBLE** or **SPLIT**.
+- House rules: 6-deck shoe; **blackjack pays 3 to 2**; **dealer stands on soft 17**; the dealer peeks for
+  blackjack with an Ace or ten showing.
+- Double on any first two cards, including after a split (except split Aces).
+- Split one pair per round. Split Aces get one card each, and 21 on a split hand pays 1:1, not 3:2.
+- No insurance, surrender or re-split.
+- The back button is hidden during a hand so a stake can't be abandoned by accident. If the browser
+  is closed mid-hand, that hand's stake is refunded the next time Taco 21 opens.
+
 ## Project layout
 
 ```

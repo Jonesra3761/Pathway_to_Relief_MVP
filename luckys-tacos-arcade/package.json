@@ -2,7 +2,7 @@
   "name": "luckys-tacos-arcade",
   "private": true,
   "version": "0.1.0",
-  "description": "Lucky's Tacos: Arcade Attack - a mobile-first arcade shooter (Phase 1)",
+  "description": "Lucky's Tacos Arcade - mobile-first arcade shooter, slots and blackjack (play credits only)",
   "type": "module",
   "scripts": {
     "dev": "vite",

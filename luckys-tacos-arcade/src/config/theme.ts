@@ -17,6 +17,8 @@ export const CSS = {
   yellow: '#ffc300',
   cream: '#fff3d6',
   dark: '#1a0e0a',
+  darkMid: '#2b1810',
+  lime: '#7bc043',
 } as const;
 
 export const FONT_FAMILY = '"Trebuchet MS", "Arial Black", Arial, sans-serif';
